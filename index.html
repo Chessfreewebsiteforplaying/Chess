@@ -3,151 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bàn Cờ Vua</title>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        h1 { text-align: center; }
-        .chess-board { 
-            display: grid; 
-            grid-template-columns: repeat(8, 50px); 
-            width: 400px; 
-            margin: auto; 
-            border: 2px solid black;
-        }
-        .chess-board div { 
-            width: 50px; 
-            height: 50px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-size: 32px; 
-        }
-        .black { background-color: #666; color: white; }
-        .white { background-color: #fff; color: black; }
-        .piece { cursor: pointer; user-select: none; }
-        .selected { outline: 2px solid yellow; } /* Đánh dấu quân cờ đã chọn */
-        #controls { text-align: center; margin-top: 20px; }
-        #pgn-input { width: 80%; }
-    </style>
+    <title>Stockfish với WebAssembly</title>
+    <script src="stockfish.js"></script>
 </head>
 <body>
-    <h1>Bàn Cờ Vua</h1>
-    <div class="chess-board" id="chess-board"></div>
-    
-    <div id="controls">
-        <textarea id="pgn-input" rows="3" placeholder="Nhập PGN ở đây..."></textarea><br>
-        <button id="load-pgn">Nạp PGN</button>
-        <button id="export-pgn">Xuất PGN</button>
-        <pre id="pgn-output"></pre>
-    </div>
+    <h1>Bàn Cờ Vua với Stockfish</h1>
+    <button id="start-stockfish">Khởi động Stockfish</button>
+    <pre id="output"></pre>
 
     <script>
-        const board = document.getElementById('chess-board');
-        const pgnInput = document.getElementById('pgn-input');
-        const pgnOutput = document.getElementById('pgn-output');
-        const loadPgnButton = document.getElementById('load-pgn');
-        const exportPgnButton = document.getElementById('export-pgn');
-        let selectedPiece = null; // Lưu quân cờ đang được chọn
-        let moveHistory = []; // Lưu lịch sử nước đi
-
-        // Tạo bàn cờ 8x8 và đặt quân cờ ban đầu
-        const initialBoard = [
-            ["♖", "♘", "♗", "♕", "♔", "♗", "♘", "♖"],
-            ["♙", "♙", "♙", "♙", "♙", "♙", "♙", "♙"],
-            ...Array(4).fill(Array(8).fill("")),
-            ["♟", "♟", "♟", "♟", "♟", "♟", "♟", "♟"],
-            ["♜", "♞", "♝", "♛", "♚", "♝", "♞", "♜"]
-        ];
-
-        function createChessBoard() {
-            board.innerHTML = '';
-            for (let i = 0; i < 8; i++) {
-                for (let j = 0; j < 8; j++) {
-                    const cell = document.createElement('div');
-                    cell.className = (i + j) % 2 === 0 ? 'white' : 'black';
-                    const piece = document.createElement('span');
-                    piece.className = 'piece';
-                    piece.textContent = initialBoard[i][j] || '';
-                    cell.appendChild(piece);
-
-                    // Xử lý chạm để chọn quân cờ
-                    piece.addEventListener('touchstart', (e) => {
-                        e.stopPropagation(); // Ngăn chặn sự kiện touch của ô
-                        handlePieceClick(piece);
-                    });
-
-                    // Xử lý chạm để di chuyển quân cờ
-                    cell.addEventListener('touchstart', () => {
-                        handleCellClick(cell);
-                    });
-
-                    board.appendChild(cell);
-                }
+        // Hàm kiểm tra hỗ trợ WebAssembly đa luồng
+        function wasmThreadsSupported() {
+            const source = Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00);
+            if (typeof WebAssembly !== "object" || typeof WebAssembly.validate !== "function")
+                return false;
+            if (!WebAssembly.validate(source)) return false;
+            if (typeof SharedArrayBuffer !== "function") return false;
+            if (typeof Atomics !== "object") return false;
+            const mem = new WebAssembly.Memory({ shared: true, initial: 8, maximum: 16 });
+            if (!(mem.buffer instanceof SharedArrayBuffer)) return false;
+            try {
+                window.postMessage(mem, "*");
+            } catch (e) {
+                return false;
             }
+            try {
+                mem.grow(8);
+            } catch (e) {
+                return false;
+            }
+            return true;
         }
 
-        // Xử lý khi quân cờ được chạm
-        function handlePieceClick(piece) {
-            if (selectedPiece) {
-                // Nếu đã chọn quân cờ, hủy chọn
-                selectedPiece.classList.remove('selected');
-                selectedPiece = null;
+        const output = document.getElementById('output');
+        let stockfish;
+
+        document.getElementById('start-stockfish').onclick = function() {
+            if (wasmThreadsSupported()) {
+                output.textContent = "Hỗ trợ WebAssembly đa luồng. Đang khởi động Stockfish...";
+                stockfish = Stockfish(); // Tạo instance Stockfish
+                
+                stockfish.onmessage = function(event) {
+                    output.textContent += event.data + '\n'; // Hiển thị thông điệp từ Stockfish
+                };
+                
+                stockfish.postMessage('uci'); // Gửi lệnh UCI để khởi động
             } else {
-                // Nếu chưa chọn, chọn quân cờ hiện tại
-                selectedPiece = piece;
-                selectedPiece.classList.add('selected');
+                output.textContent = "Trình duyệt không hỗ trợ WebAssembly đa luồng. Không thể khởi động Stockfish.";
             }
-        }
-
-        // Xử lý khi ô cờ được chạm
-        function handleCellClick(cell) {
-            if (selectedPiece && cell.querySelector('.piece').textContent === '') {
-                // Nếu đã chọn quân cờ và ô cờ trống, di chuyển quân cờ
-                const from = selectedPiece.parentElement;
-                const fromIndex = Array.from(board.children).indexOf(from);
-                const toIndex = Array.from(board.children).indexOf(cell);
-
-                cell.querySelector('.piece').textContent = selectedPiece.textContent; // Di chuyển quân cờ
-                selectedPiece.textContent = ''; // Xóa quân cờ ở ô cũ
-                selectedPiece.classList.remove('selected');
-
-                // Ghi lại nước đi vào lịch sử
-                moveHistory.push(`Move ${moveHistory.length + 1}: ${selectedPiece.textContent} from ${fromIndex} to ${toIndex}`);
-
-                selectedPiece = null; // Hủy chọn sau khi di chuyển
-                updatePGNOutput();
-            }
-        }
-
-        // Hàm xuất PGN
-        function exportPGN() {
-            let pgn = '';
-            moveHistory.forEach(move => {
-                pgn += move + '\n';
-            });
-            return pgn.trim();
-        }
-
-        // Cập nhật hiển thị PGN
-        function updatePGNOutput() {
-            pgnOutput.textContent = exportPGN();
-        }
-
-        // Hàm nạp PGN
-        function loadPGN() {
-            const pgn = pgnInput.value;
-            // Xử lý nạp PGN - bạn cần triển khai logic của riêng bạn ở đây
-            // Ví dụ: Xóa bàn cờ và thiết lập lại theo PGN
-            alert("Tính năng nạp PGN chưa được triển khai.");
-        }
-
-        // Thêm sự kiện cho nút nạp và xuất PGN
-        loadPgnButton.addEventListener('click', loadPGN);
-        exportPgnButton.addEventListener('click', () => {
-            pgnOutput.textContent = exportPGN();
-        });
-
-        createChessBoard();
+        };
     </script>
 </body>
 </html>
