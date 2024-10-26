@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bàn Cờ Vua với Lichess API</title>
+    <title>Bàn Cờ Vua với PGN và Lichess API</title>
     <style>
         body { font-family: Arial, sans-serif; }
         #chess-board { display: grid; grid-template-columns: repeat(8, 50px); }
@@ -11,11 +11,12 @@
         #chess-board .black { background-color: #666; }
         #chess-board .white { background-color: #fff; }
         button { margin: 10px; padding: 10px; font-size: 16px; }
+        pre { background-color: #f4f4f4; padding: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <h1>Bàn Cờ Vua với Lichess API</h1>
-    <button id="get-game">Nhập ID Trò Chơi Lichess</button>
+    <h1>Bàn Cờ Vua với PGN và Lichess API</h1>
+    <button id="get-pgn">Nhập PGN Trò Chơi</button>
     <pre id="output"></pre>
     <div id="chess-board"></div>
 
@@ -35,34 +36,71 @@
             }
         }
 
-        // Fetch game state from Lichess API
-        async function fetchGame(gameId) {
+        // Fetch analysis from Lichess API
+        async function analyzeGame(pgn) {
             try {
-                const response = await fetch(`https://lichess.org/api/game/state/${gameId}`);
-                if (!response.ok) throw new Error('Không thể tải trạng thái trò chơi');
+                const response = await fetch('https://lichess.org/api/cloud-eval', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ pgn: pgn })
+                });
 
-                const gameData = await response.json();
-                output.textContent = JSON.stringify(gameData, null, 2);
+                if (!response.ok) throw new Error('Không thể tải kết quả phân tích');
 
-                // Kiểm tra xem Lichess API có chạy không
-                console.log("Lichess API đã chạy thành công!", gameData); // Hiển thị thông báo thành công
-
-                // Cập nhật bảng cờ dựa trên dữ liệu trò chơi nếu cần
-                // Ví dụ: bạn có thể phân tích các vị trí và thêm quân cờ lên bảng
+                const analysisData = await response.json();
+                output.textContent = JSON.stringify(analysisData, null, 2);
+                console.log("Kết quả phân tích:", analysisData); // Log the analysis result
 
             } catch (error) {
                 output.textContent = error.message;
-                console.log("Lỗi khi gọi Lichess API:", error); // Hiển thị thông báo lỗi
+                console.log("Lỗi khi gọi Lichess API:", error); // Log error
             }
         }
 
+        // Parse PGN and update the chessboard
+        function parsePGN(pgn) {
+            const moves = pgn.match(/\d+\.\s([^\s]+)\s+([^\s]+)/g); // Match moves
+            if (!moves) return;
+
+            createChessBoard(); // Create the chessboard
+
+            // Create a map for converting PGN to board positions
+            const boardMap = {
+                'a1': 56, 'b1': 57, 'c1': 58, 'd1': 59, 'e1': 60, 'f1': 61, 'g1': 62, 'h1': 63,
+                'a2': 48, 'b2': 49, 'c2': 50, 'd2': 51, 'e2': 52, 'f2': 53, 'g2': 54, 'h2': 55,
+                'a7': 8, 'b7': 9, 'c7': 10, 'd7': 11, 'e7': 12, 'f7': 13, 'g7': 14, 'h7': 15,
+                'a8': 0, 'b8': 1, 'c8': 2, 'd8': 3, 'e8': 4, 'f8': 5, 'g8': 6, 'h8': 7,
+            };
+
+            // Update board based on moves
+            moves.forEach(move => {
+                const parts = move.split(' ');
+                const fromSquare = parts[0].slice(0, 2); // Get starting square
+                const toSquare = parts[1].slice(0, 2); // Get destination square
+
+                // Translate squares into array index and place pieces (simplified logic)
+                const fromIndex = boardMap[fromSquare];
+                const toIndex = boardMap[toSquare];
+
+                // This logic assumes a standard chess setup, adjust as needed
+                if (fromIndex !== undefined && toIndex !== undefined) {
+                    // Update the board position (you may need more logic to actually place pieces)
+                    console.log(`Di chuyển từ ${fromSquare} đến ${toSquare}`);
+                }
+            });
+        }
+
         // Event listener for button click
-        document.getElementById('get-game').onclick = function() {
-            const gameId = prompt("Nhập ID trò chơi Lichess:"); // Hộp thoại nhập ID
-            if (gameId) {
-                fetchGame(gameId); // Fetch the game state
+        document.getElementById('get-pgn').onclick = function() {
+            const pgn = prompt("Nhập PGN trò chơi:"); // Prompt for PGN
+            if (pgn) {
+                output.textContent = pgn; // Display PGN
+                analyzeGame(pgn); // Analyze the game with Lichess API
+                parsePGN(pgn); // Parse and update the board
             } else {
-                alert("Vui lòng nhập ID trò chơi."); // Thông báo nếu không có ID
+                alert("Vui lòng nhập PGN."); // Alert if no PGN is provided
             }
         };
 
