@@ -25,24 +25,38 @@
         .black { background-color: #666; color: white; }
         .white { background-color: #fff; color: black; }
         .piece { cursor: pointer; user-select: none; }
+        .selected { outline: 2px solid yellow; } /* Đánh dấu quân cờ đã chọn */
+        #controls { text-align: center; margin-top: 20px; }
+        #pgn-input { width: 80%; }
     </style>
 </head>
 <body>
     <h1>Bàn Cờ Vua</h1>
-    <div class="chess-board" id="chess-board">
-        <!-- Các quân cờ sẽ được tạo bằng JavaScript -->
+    <div class="chess-board" id="chess-board"></div>
+    
+    <div id="controls">
+        <textarea id="pgn-input" rows="3" placeholder="Nhập PGN ở đây..."></textarea><br>
+        <button id="load-pgn">Nạp PGN</button>
+        <button id="export-pgn">Xuất PGN</button>
+        <pre id="pgn-output"></pre>
     </div>
 
     <script>
         const board = document.getElementById('chess-board');
+        const pgnInput = document.getElementById('pgn-input');
+        const pgnOutput = document.getElementById('pgn-output');
+        const loadPgnButton = document.getElementById('load-pgn');
+        const exportPgnButton = document.getElementById('export-pgn');
+        let selectedPiece = null; // Lưu quân cờ đang được chọn
+        let moveHistory = []; // Lưu lịch sử nước đi
 
         // Tạo bàn cờ 8x8 và đặt quân cờ ban đầu
         const initialBoard = [
             ["♖", "♘", "♗", "♕", "♔", "♗", "♘", "♖"],
             ["♙", "♙", "♙", "♙", "♙", "♙", "♙", "♙"],
             ...Array(4).fill(Array(8).fill("")),
-            ["♙", "♙", "♙", "♙", "♙", "♙", "♙", "♙"],
-            ["♖", "♘", "♗", "♕", "♔", "♗", "♘", "♖"]
+            ["♟", "♟", "♟", "♟", "♟", "♟", "♟", "♟"],
+            ["♜", "♞", "♝", "♛", "♚", "♝", "♞", "♜"]
         ];
 
         function createChessBoard() {
@@ -54,71 +68,84 @@
                     const piece = document.createElement('span');
                     piece.className = 'piece';
                     piece.textContent = initialBoard[i][j] || '';
-
-                    if (piece.textContent) {
-                        piece.setAttribute('draggable', true);
-                    }
-
-                    // Di chuyển quân cờ trên cả máy tính và điện thoại
-                    piece.addEventListener('dragstart', handleDragStart);
-                    piece.addEventListener('touchstart', handleTouchStart);
-                    piece.addEventListener('touchmove', handleTouchMove);
-                    piece.addEventListener('touchend', handleTouchEnd);
-
-                    cell.addEventListener('dragover', handleDragOver);
-                    cell.addEventListener('drop', handleDrop);
-
                     cell.appendChild(piece);
+
+                    // Xử lý chạm để chọn quân cờ
+                    piece.addEventListener('touchstart', (e) => {
+                        e.stopPropagation(); // Ngăn chặn sự kiện touch của ô
+                        handlePieceClick(piece);
+                    });
+
+                    // Xử lý chạm để di chuyển quân cờ
+                    cell.addEventListener('touchstart', () => {
+                        handleCellClick(cell);
+                    });
+
                     board.appendChild(cell);
                 }
             }
         }
 
-        // Xử lý kéo-thả trên máy tính
-        let draggedPiece = null;
-
-        function handleDragStart(e) {
-            draggedPiece = e.target;
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            if (draggedPiece && e.target.classList.contains('piece') && !e.target.textContent) {
-                e.target.textContent = draggedPiece.textContent;
-                draggedPiece.textContent = '';
-                draggedPiece = null;
+        // Xử lý khi quân cờ được chạm
+        function handlePieceClick(piece) {
+            if (selectedPiece) {
+                // Nếu đã chọn quân cờ, hủy chọn
+                selectedPiece.classList.remove('selected');
+                selectedPiece = null;
+            } else {
+                // Nếu chưa chọn, chọn quân cờ hiện tại
+                selectedPiece = piece;
+                selectedPiece.classList.add('selected');
             }
         }
 
-        // Xử lý kéo-thả trên thiết bị di động
-        function handleTouchStart(e) {
-            draggedPiece = e.target;
-        }
+        // Xử lý khi ô cờ được chạm
+        function handleCellClick(cell) {
+            if (selectedPiece && cell.querySelector('.piece').textContent === '') {
+                // Nếu đã chọn quân cờ và ô cờ trống, di chuyển quân cờ
+                const from = selectedPiece.parentElement;
+                const fromIndex = Array.from(board.children).indexOf(from);
+                const toIndex = Array.from(board.children).indexOf(cell);
 
-        function handleTouchMove(e) {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const piece = document.elementFromPoint(touch.clientX, touch.clientY);
+                cell.querySelector('.piece').textContent = selectedPiece.textContent; // Di chuyển quân cờ
+                selectedPiece.textContent = ''; // Xóa quân cờ ở ô cũ
+                selectedPiece.classList.remove('selected');
 
-            if (piece && piece.classList.contains('piece') && !piece.textContent) {
-                piece.style.background = '#ccc'; // Hiệu ứng tạm thời
+                // Ghi lại nước đi vào lịch sử
+                moveHistory.push(`Move ${moveHistory.length + 1}: ${selectedPiece.textContent} from ${fromIndex} to ${toIndex}`);
+
+                selectedPiece = null; // Hủy chọn sau khi di chuyển
+                updatePGNOutput();
             }
         }
 
-        function handleTouchEnd(e) {
-            const touch = e.changedTouches[0];
-            const target = document.elementFromPoint(touch.clientX, touch.clientY);
-
-            if (draggedPiece && target && target.classList.contains('piece') && !target.textContent) {
-                target.textContent = draggedPiece.textContent;
-                draggedPiece.textContent = '';
-            }
-            draggedPiece = null;
+        // Hàm xuất PGN
+        function exportPGN() {
+            let pgn = '';
+            moveHistory.forEach(move => {
+                pgn += move + '\n';
+            });
+            return pgn.trim();
         }
+
+        // Cập nhật hiển thị PGN
+        function updatePGNOutput() {
+            pgnOutput.textContent = exportPGN();
+        }
+
+        // Hàm nạp PGN
+        function loadPGN() {
+            const pgn = pgnInput.value;
+            // Xử lý nạp PGN - bạn cần triển khai logic của riêng bạn ở đây
+            // Ví dụ: Xóa bàn cờ và thiết lập lại theo PGN
+            alert("Tính năng nạp PGN chưa được triển khai.");
+        }
+
+        // Thêm sự kiện cho nút nạp và xuất PGN
+        loadPgnButton.addEventListener('click', loadPGN);
+        exportPgnButton.addEventListener('click', () => {
+            pgnOutput.textContent = exportPGN();
+        });
 
         createChessBoard();
     </script>
