@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bàn Cờ Vua Có Thể Di Chuyển Quân Cờ</title>
+    <title>Bàn Cờ Vua</title>
     <style>
         body { font-family: Arial, sans-serif; }
         h1 { text-align: center; }
@@ -24,88 +24,103 @@
         }
         .black { background-color: #666; color: white; }
         .white { background-color: #fff; color: black; }
-        .piece { cursor: pointer; }
+        .piece { cursor: pointer; user-select: none; }
     </style>
 </head>
 <body>
-    <h1>Bàn Cờ Vua Có Thể Di Chuyển Quân Cờ</h1>
-    <div class="chess-board">
-        <!-- Bàn cờ và các quân cờ được đặt sẵn -->
-        <div class="white"><span class="piece" draggable="true">♖</span></div>
-        <div class="black"><span class="piece" draggable="true">♘</span></div>
-        <div class="white"><span class="piece" draggable="true">♗</span></div>
-        <div class="black"><span class="piece" draggable="true">♕</span></div>
-        <div class="white"><span class="piece" draggable="true">♔</span></div>
-        <div class="black"><span class="piece" draggable="true">♗</span></div>
-        <div class="white"><span class="piece" draggable="true">♘</span></div>
-        <div class="black"><span class="piece" draggable="true">♖</span></div>
-
-        <!-- Dòng 2: Tốt đen -->
-        <div class="black"><span class="piece" draggable="true">♙</span></div>
-        <div class="white"><span class="piece" draggable="true">♙</span></div>
-        <div class="black"><span class="piece" draggable="true">♙</span></div>
-        <div class="white"><span class="piece" draggable="true">♙</span></div>
-        <div class="black"><span class="piece" draggable="true">♙</span></div>
-        <div class="white"><span class="piece" draggable="true">♙</span></div>
-        <div class="black"><span class="piece" draggable="true">♙</span></div>
-        <div class="white"><span class="piece" draggable="true">♙</span></div>
-
-        <!-- Các ô trống ở giữa -->
-        <div class="white"></div><div class="black"></div><div class="white"></div><div class="black"></div>
-        <div class="white"></div><div class="black"></div><div class="white"></div><div class="black"></div>
-        <!-- Lặp lại các ô trống cho các dòng giữa -->
-        <div class="black"></div><div class="white"></div><div class="black"></div><div class="white"></div>
-        <div class="black"></div><div class="white"></div><div class="black"></div><div class="white"></div>
-
-        <!-- Tốt trắng -->
-        <div class="white"><span class="piece" draggable="true">♙</span></div>
-        <div class="black"><span class="piece" draggable="true">♙</span></div>
-        <div class="white"><span class="piece" draggable="true">♙</span></div>
-        <div class="black"><span class="piece" draggable="true">♙</span></div>
-        <div class="white"><span class="piece" draggable="true">♙</span></div>
-        <div class="black"><span class="piece" draggable="true">♙</span></div>
-        <div class="white"><span class="piece" draggable="true">♙</span></div>
-        <div class="black"><span class="piece" draggable="true">♙</span></div>
-
-        <!-- Quân trắng còn lại -->
-        <div class="black"><span class="piece" draggable="true">♖</span></div>
-        <div class="white"><span class="piece" draggable="true">♘</span></div>
-        <div class="black"><span class="piece" draggable="true">♗</span></div>
-        <div class="white"><span class="piece" draggable="true">♕</span></div>
-        <div class="black"><span class="piece" draggable="true">♔</span></div>
-        <div class="white"><span class="piece" draggable="true">♗</span></div>
-        <div class="black"><span class="piece" draggable="true">♘</span></div>
-        <div class="white"><span class="piece" draggable="true">♖</span></div>
+    <h1>Bàn Cờ Vua</h1>
+    <div class="chess-board" id="chess-board">
+        <!-- Các quân cờ sẽ được tạo bằng JavaScript -->
     </div>
 
     <script>
-        // Kéo-thả các quân cờ
-        const pieces = document.querySelectorAll('.piece');
+        const board = document.getElementById('chess-board');
+
+        // Tạo bàn cờ 8x8 và đặt quân cờ ban đầu
+        const initialBoard = [
+            ["♖", "♘", "♗", "♕", "♔", "♗", "♘", "♖"],
+            ["♙", "♙", "♙", "♙", "♙", "♙", "♙", "♙"],
+            ...Array(4).fill(Array(8).fill("")),
+            ["♙", "♙", "♙", "♙", "♙", "♙", "♙", "♙"],
+            ["♖", "♘", "♗", "♕", "♔", "♗", "♘", "♖"]
+        ];
+
+        function createChessBoard() {
+            board.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = (i + j) % 2 === 0 ? 'white' : 'black';
+                    const piece = document.createElement('span');
+                    piece.className = 'piece';
+                    piece.textContent = initialBoard[i][j] || '';
+
+                    if (piece.textContent) {
+                        piece.setAttribute('draggable', true);
+                    }
+
+                    // Di chuyển quân cờ trên cả máy tính và điện thoại
+                    piece.addEventListener('dragstart', handleDragStart);
+                    piece.addEventListener('touchstart', handleTouchStart);
+                    piece.addEventListener('touchmove', handleTouchMove);
+                    piece.addEventListener('touchend', handleTouchEnd);
+
+                    cell.addEventListener('dragover', handleDragOver);
+                    cell.addEventListener('drop', handleDrop);
+
+                    cell.appendChild(piece);
+                    board.appendChild(cell);
+                }
+            }
+        }
+
+        // Xử lý kéo-thả trên máy tính
         let draggedPiece = null;
 
-        pieces.forEach(piece => {
-            piece.addEventListener('dragstart', function () {
-                draggedPiece = piece;
-            });
+        function handleDragStart(e) {
+            draggedPiece = e.target;
+        }
 
-            piece.addEventListener('dragend', function () {
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            if (draggedPiece && e.target.classList.contains('piece') && !e.target.textContent) {
+                e.target.textContent = draggedPiece.textContent;
+                draggedPiece.textContent = '';
                 draggedPiece = null;
-            });
-        });
+            }
+        }
 
-        const cells = document.querySelectorAll('.chess-board div');
-        cells.forEach(cell => {
-            cell.addEventListener('dragover', function (e) {
-                e.preventDefault();
-            });
+        // Xử lý kéo-thả trên thiết bị di động
+        function handleTouchStart(e) {
+            draggedPiece = e.target;
+        }
 
-            cell.addEventListener('drop', function () {
-                if (draggedPiece) {
-                    cell.innerHTML = '';
-                    cell.appendChild(draggedPiece);
-                }
-            });
-        });
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const piece = document.elementFromPoint(touch.clientX, touch.clientY);
+
+            if (piece && piece.classList.contains('piece') && !piece.textContent) {
+                piece.style.background = '#ccc'; // Hiệu ứng tạm thời
+            }
+        }
+
+        function handleTouchEnd(e) {
+            const touch = e.changedTouches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+
+            if (draggedPiece && target && target.classList.contains('piece') && !target.textContent) {
+                target.textContent = draggedPiece.textContent;
+                draggedPiece.textContent = '';
+            }
+            draggedPiece = null;
+        }
+
+        createChessBoard();
     </script>
 </body>
 </html>
