@@ -1,4 +1,1 @@
-stockfish.onmessage = function(event) {
-    console.log("Phản hồi từ Stockfish:", event.data); // Kiểm tra phản hồi
-    output.textContent += event.data + '\n';
-};
+
